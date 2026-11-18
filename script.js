@@ -1,13 +1,13 @@
 
-const API_URL = "https://cmal.onrender.com/chat";
+const CHAT_MODEL = "gpt-5.4-nano";
 
 let conversationHistory = [];
 let isSending = false;
 
 function addMessage(text, type) {
   const chat = document.getElementById("chat");
-
   const div = document.createElement("div");
+
   div.className = "message " + type;
   div.textContent = text;
 
@@ -29,6 +29,14 @@ async function sendMessage() {
 
   if (!text || isSending) return;
 
+  if (!window.puter || !puter.ai) {
+    addMessage(
+      "Puter bağlantısı yüklenemedi. İnternet bağlantını kontrol et.",
+      "bot"
+    );
+    return;
+  }
+
   const welcome = document.getElementById("welcome");
   if (welcome) welcome.remove();
 
@@ -36,46 +44,57 @@ async function sendMessage() {
   input.value = "";
 
   const loading = addMessage("CmAl düşünüyor...", "bot");
-
   isSending = true;
 
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
+    const messages = [
+      {
+        role: "system",
+        content:
+          "Sen CmAl adında Türkçe konuşan, bilgili, doğal ve yardımcı bir yapay zekâ asistanısın. Soruları açık ve doğru cevapla. Emin olmadığın bilgileri uydurma. Kullanıcı başka dil isterse o dilde konuş."
       },
-      body: JSON.stringify({
-        message: text,
-        history: conversationHistory
-      })
+      ...conversationHistory,
+      {
+        role: "user",
+        content: text
+      }
+    ];
+
+    const response = await puter.ai.chat(messages, {
+      model: CHAT_MODEL
     });
 
-    const data = await response.json();
+    let reply = "";
 
-    if (!response.ok) {
-      throw new Error(data.error || "Sunucu hatası");
+    if (typeof response === "string") {
+      reply = response;
+    } else if (response?.message?.content) {
+      const content = response.message.content;
+
+      reply = Array.isArray(content)
+        ? content.map(part => part.text || "").join("")
+        : String(content);
+    } else {
+      reply = "CmAl cevap oluşturamadı. Tekrar deneyebilirsin.";
     }
-
-    const reply = data.reply || "Cevap alınamadı.";
 
     loading.textContent = reply;
 
     conversationHistory.push(
-      { role: "user", text: text },
-      { role: "model", text: reply }
+      { role: "user", content: text },
+      { role: "assistant", content: reply }
     );
 
-    conversationHistory = conversationHistory.slice(-12);
+    conversationHistory = conversationHistory.slice(-20);
 
   } catch (error) {
+    console.error("CmAl AI:", error);
+
     loading.textContent =
-      "CmAl şu anda bağlantı kuramıyor. Biraz sonra tekrar dene.";
-
-    console.error("CmAl bağlantı hatası:", error);
-
+      "CmAl şu anda cevap alamadı. Puter hesabını, model erişimini ve internet bağlantını kontrol et.";
   } finally {
     isSending = false;
+    input.focus();
   }
 }
 
@@ -86,8 +105,20 @@ function newChat() {
 
   chat.innerHTML = `
     <div id="welcome">
-      <h2>Merhaba, ben CmAl.</h2>
-      <p>Sana nasıl yardımcı olabilirim?</p>
+      <h1>Merhaba.</h1>
+      <p>Ben CmAl. Sana nasıl yardımcı olabilirim?</p>
     </div>
   `;
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const input = document.getElementById("msg");
+
+  if (input) {
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        sendMessage();
+      }
+    });
+  }
+});
