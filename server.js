@@ -5,25 +5,38 @@ const cors = require("cors");
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "30kb" }));
+
+const MODEL = "gemini-3.8-flash";
+
+const SYSTEM_PROMPT = `
+Sen CmAl adında Türkçe konuşan, yardımcı, doğal ve
+samimi bir yapay zekâ asistanısın.
+
+Kurallar:
+- Kullanıcıya açık, anlaşılır ve doğru cevaplar ver.
+- Türkçe konuş; kullanıcı başka dil isterse o dile geç.
+- Matematik, bilim, tarih, teknoloji, yazılım ve günlük
+  sohbet konularında yardımcı ol.
+- Emin olmadığın bilgileri kesinmiş gibi sunma.
+- Kullanıcı kaba konuşursa sakin ve saygılı cevap ver.
+- Kendini CmAl olarak tanıt.
+- Gereksiz yere aynı cümleleri tekrarlama.
+`;
 
 app.get("/", (req, res) => {
   res.send("CmAl AI Server aktif! 🚀");
 });
 
 app.get("/health", (req, res) => {
-  res.json({
-    status: "online",
-    name: "CmAl",
-    ai: "Gemini"
-  });
+  res.json({ status: "ok", ai: "CmAl" });
 });
 
 app.post("/chat", async (req, res) => {
   try {
     const message = req.body.message;
 
-    if (!message || typeof message !== "string") {
+    if (typeof message !== "string" || !message.trim()) {
       return res.status(400).json({
         error: "Lütfen bir mesaj yaz."
       });
@@ -39,15 +52,37 @@ app.post("/chat", async (req, res) => {
 
     if (!apiKey) {
       return res.status(500).json({
-        error: "API anahtarı bulunamadı."
+        error: "Gemini API anahtarı sunucuda bulunamadı."
       });
     }
 
-    const model =
-      process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+    const previous = Array.isArray(req.body.history)
+      ? req.body.history.slice(-12)
+      : [];
+
+    const history = previous
+      .filter(item =>
+        item &&
+        ["user", "model"].includes(item.role) &&
+        typeof item.text === "string"
+      )
+      .map(item => ({
+        role: item.role,
+        parts: [{ text: item.text.slice(0, 4000) }]
+      }));
+
+    const contents = [
+      ...history,
+      {
+        role: "user",
+        parts: [{ text: message.trim() }]
+      }
+    ];
+
+    console.log("CmAl mesaj aldı.");
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
       {
         method: "POST",
         headers: {
@@ -55,22 +90,13 @@ app.post("/chat", async (req, res) => {
           "x-goog-api-key": apiKey
         },
         body: JSON.stringify({
-          system_instruction: {
-            parts: [{
-              text: "Sen CmAl adında yardımcı, samimi ve bilgili bir yapay zekâ asistanısın. Kullanıcıyla Türkçe konuş. Açık, anlaşılır ve faydalı cevaplar ver. Kullanıcıya saygılı davran."
-            }]
+          systemInstruction: {
+            parts: [{ text: SYSTEM_PROMPT }]
           },
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { text: message }
-              ]
-            }
-          ],
+          contents,
           generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024
+            temperature: 0.8,
+            maxOutputTokens: 2048
           }
         })
       }
@@ -82,7 +108,7 @@ app.post("/chat", async (req, res) => {
       console.error("Gemini API hatası:", data);
 
       return res.status(502).json({
-        error: "Gemini şu anda cevap veremiyor. Biraz sonra tekrar dene."
+        error: "Gemini cevap veremedi. Sunucu loglarını kontrol et."
       });
     }
 
@@ -93,14 +119,16 @@ app.post("/chat", async (req, res) => {
 
     if (!reply) {
       return res.status(502).json({
-        error: "CmAl cevap oluşturamadı."
+        error: "Gemini boş cevap döndürdü."
       });
     }
+
+    console.log("CmAl cevap oluşturdu.");
 
     res.json({ reply });
 
   } catch (error) {
-    console.error("CmAl hatası:", error.message);
+    console.error("CmAl sunucu hatası:", error);
 
     res.status(500).json({
       error: "Sunucuda bir hata oluştu."
@@ -111,5 +139,5 @@ app.post("/chat", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("CmAl AI Server çalışıyor: " + PORT);
+  console.log("CmAl AI çalışıyor: " + PORT);
 });
