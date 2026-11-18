@@ -30,16 +30,21 @@ jobs:
         run: npm install
 
       - name: Web dosyalarini hazirla
-            - name: Logo dosyasini hazirla
+        run: npm run build:web
+
+      - name: Logo dosyasini hazirla
         run: |
           mkdir -p assets
           cp cmal-icon-1024.png assets/icon.png
-        run: npm run build:web
 
       - name: Android projesini olustur
-            - name: CmAl ikonlarini olustur
-        run: npx @capacitor/assets generate --android
         run: npx cap add android
+
+      - name: Ikon paketini kur
+        run: npm install --save-dev @capacitor/assets
+
+      - name: CmAl ikonlarini olustur
+        run: npx capacitor-assets generate --android
 
       - name: Android dosyalarini senkronize et
         run: npx cap sync android
