@@ -1,0 +1,48 @@
+
+name: CmAl APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodlari indir
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Java kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Paketleri kur
+        run: npm install
+
+      - name: Web dosyalarini hazirla
+        run: npm run build:web
+
+      - name: Android projesini olustur
+        run: npx cap add android
+
+      - name: Android dosyalarini senkronize et
+        run: npx cap sync android
+
+      - name: APK derle
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: APK dosyasini sun
+        uses: actions/upload-artifact@v4
+        with:
+          name: CmAl-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
