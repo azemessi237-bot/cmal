@@ -1,3 +1,4 @@
+
 const express = require("express");
 const cors = require("cors");
 
@@ -10,13 +11,21 @@ app.get("/", (req, res) => {
   res.send("CmAl AI Server aktif! 🚀");
 });
 
+app.get("/health", (req, res) => {
+  res.json({
+    status: "online",
+    name: "CmAl",
+    ai: "Gemini"
+  });
+});
+
 app.post("/chat", async (req, res) => {
   try {
     const message = req.body.message;
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({
-        error: "Mesaj gerekli."
+        error: "Lütfen bir mesaj yaz."
       });
     }
 
@@ -30,7 +39,7 @@ app.post("/chat", async (req, res) => {
 
     if (!apiKey) {
       return res.status(500).json({
-        error: "AI sunucu anahtarı ayarlanmamış."
+        error: "API anahtarı bulunamadı."
       });
     }
 
@@ -46,12 +55,23 @@ app.post("/chat", async (req, res) => {
           "x-goog-api-key": apiKey
         },
         body: JSON.stringify({
+          system_instruction: {
+            parts: [{
+              text: "Sen CmAl adında yardımcı, samimi ve bilgili bir yapay zekâ asistanısın. Kullanıcıyla Türkçe konuş. Açık, anlaşılır ve faydalı cevaplar ver. Kullanıcıya saygılı davran."
+            }]
+          },
           contents: [
             {
               role: "user",
-              parts: [{ text: message }]
+              parts: [
+                { text: message }
+              ]
             }
-          ]
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
         })
       }
     );
@@ -59,21 +79,28 @@ app.post("/chat", async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("AI servis hatası:", data);
+      console.error("Gemini API hatası:", data);
+
       return res.status(502).json({
-        error: "AI şu anda cevap veremiyor."
+        error: "Gemini şu anda cevap veremiyor. Biraz sonra tekrar dene."
       });
     }
 
-    const reply =
-      data.candidates?.[0]?.content?.parts
-        ?.map(part => part.text || "")
-        .join("") || "Cevap oluşturulamadı.";
+    const reply = data.candidates?.[0]?.content?.parts
+      ?.map(part => part.text || "")
+      .join("")
+      .trim();
+
+    if (!reply) {
+      return res.status(502).json({
+        error: "CmAl cevap oluşturamadı."
+      });
+    }
 
     res.json({ reply });
 
   } catch (error) {
-    console.error("CmAl sunucu hatası:", error.message);
+    console.error("CmAl hatası:", error.message);
 
     res.status(500).json({
       error: "Sunucuda bir hata oluştu."
