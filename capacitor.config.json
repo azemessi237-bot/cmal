@@ -1,5 +1,14 @@
+
 {
   "appId": "com.azemessi237.cmal",
   "appName": "CmAl",
-  "webDir": "www"
+  "webDir": "www",
+  "server": {
+    "url": "https://azemessi237-bot.github.io/cmal/",
+    "allowNavigation": [
+      "azemessi237-bot.github.io",
+      "puter.com",
+      "*.puter.com"
+    ]
+  }
 }
